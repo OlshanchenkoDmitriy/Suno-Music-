@@ -1,0 +1,178 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Music Generator</title>
+    <link rel="stylesheet" href="index.css">
+    <script type="module" src="index.tsx"></script>
+<script type="importmap">
+{
+  "imports": {
+    "express": "https://aistudiocdn.com/express@^5.1.0",
+    "cors": "https://aistudiocdn.com/cors@^2.8.5",
+    "dotenv/": "https://aistudiocdn.com/dotenv@^17.2.1/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.16.0"
+  }
+}
+</script>
+</head>
+<body>
+    <div id="app-container">
+        <div id="main-view">
+            <aside class="sidebar">
+                <header class="app-header">
+                    <button class="header-btn" id="my-prompts-btn">My Prompts</button>
+                    <button class="header-btn">+ Persona</button>
+                    <button class="header-btn">+ Inspo</button>
+                </header>
+
+                <main class="controls">
+                    <section class="control-section">
+                         <div class="input-control">
+                            <label for="song-title">Song Title</label>
+                            <input type="text" id="song-title" placeholder="Enter song title (required to save)">
+                        </div>
+                    </section>
+                    
+                    <section class="control-section" id="lyrics-section">
+                        <div class="section-header">
+                            <h2><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12 13c0 1.105-1.12 2-2.5 2S7 14.105 7 13s1.12-2 2.5-2 2.5.895 2.5 2z"/><path fill-rule="evenodd" d="M12 3v10h-1V3h1z"/><path d="M11 2.82a1 1 0 0 1 .804-.98l3-.6A1 1 0 0 1 16 2.22V4l-5 1V2.82z"/><path fill-rule="evenodd" d="M0 11.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5zm0-4A.5.5 0 0 1 .5 7H8a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5zm0-4A.5.5 0 0 1 .5 3H8a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5z"/></svg> Lyrics</h2>
+                            <div class="lyrics-mode">
+                                <button class="mode-btn active">Auto</button>
+                                <button class="mode-btn" id="write-lyrics-btn">Write Lyrics</button>
+                            </div>
+                        </div>
+                        <textarea id="lyrics-input" placeholder="Enter your lyrics here, or use the &quot;Write Lyrics&quot; button to generate them."></textarea>
+                        <div id="lyrics-char-count" class="char-counter">0 / 5000</div>
+                        <div class="instrumental-toggle">
+                            <label class="switch">
+                                <input type="checkbox" id="instrumental-checkbox">
+                                <span class="slider round"></span>
+                            </label>
+                            <span>Instrumental</span>
+                        </div>
+                        <div class="lyrics-actions">
+                            <button class="action-btn" id="fix-lyrics-btn">Fix/Translate</button>
+                            <button class="action-btn">+ By Line</button>
+                            <button class="action-btn" id="generate-lyrics-btn">+ Full Song</button>
+                        </div>
+                    </section>
+
+                    <section class="control-section" id="styles-section">
+                        <div class="section-header">
+                            <h2><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M9 13c0 1.105-1.12 2-2.5 2S4 14.105 4 13s1.12-2 2.5-2 2.5.895 2.5 2z"/><path fill-rule="evenodd" d="M9 3v10H8V3h1z"/><path d="M8 2.82a1 1 0 0 1 .804-.98l3-.6A1 1 0 0 1 13 2.22V4L8 5V2.82z"/><path fill-rule="evenodd" d="M0 11.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5zm0-4A.5.5 0 0 1 .5 7H4a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5zm0-4A.5.5 0 0 1 .5 3H4a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5z"/></svg> Styles</h2>
+                            <button class="clear-btn">&times;</button>
+                        </div>
+                        <div class="tags-input-container">
+                            <div id="style-tags" class="style-tags"></div>
+                            <input type="text" id="style-input" placeholder="Enter style tags" maxlength="100">
+                        </div>
+                        <div id="styles-char-count" class="char-counter">0 / 1000</div>
+                        <div class="suggested-tags" id="suggested-tags-container">
+                            <span><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.5A4.5 4.5 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 1 8.757-4.282.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.5A4.5 4.5 0 0 0 8 13c1.552 0 2.94-.707 3.857-1.818a.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg></span>
+                        </div>
+                    </section>
+
+                    <section class="control-section collapsible">
+                         <div class="section-header" data-toggle="collapse">
+                            <h2>Advanced Options <span class="new-badge">NEW</span></h2>
+                            <span class="chevron"></span>
+                        </div>
+                        <div class="collapsible-content">
+                            <div class="slider-control">
+                                <label for="vocal-gender">Vocal Gender</label>
+                                <div class="slider-labels"><span>Male</span><span>Female</span></div>
+                                <input type="range" id="vocal-gender" min="0" max="100" value="50">
+                            </div>
+                            <div class="slider-control">
+                                <label for="weirdness">Weirdness <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="info-icon" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.054.392.132.392.287v1.275h-.21a.5.5 0 0 0-.5.5v.105a.5.5 0 0 0 .5.5h.21v1.154a.5.5 0 0 0 .5.5h.16a.5.5 0 0 0 .5-.5v-1.154h.29a.5.5 0 0 0 .491-.408l.082-.381a.5.5 0 0 0-.49-.59h-.29v-1.275a.5.5 0 0 0-.392-.487zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg></label>
+                                <span class="slider-value" id="weirdness-value">50%</span>
+                                <input type="range" id="weirdness" min="0" max="100" value="50">
+                            </div>
+                            <div class="slider-control">
+                                <label for="style-influence">Style Influence <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="currentColor" class="info-icon" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.054.392.132.392.287v1.275h-.21a.5.5 0 0 0-.5.5v.105a.5.5 0 0 0 .5.5h.21v1.154a.5.5 0 0 0 .5.5h.16a.5.5 0 0 0 .5-.5v-1.154h.29a.5.5 0 0 0 .491-.408l.082-.381a.5.5 0 0 0-.49-.59h-.29v-1.275a.5.5 0 0 0-.392-.487zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg></label>
+                                 <span class="slider-value" id="style-influence-value">50%</span>
+                                <input type="range" id="style-influence" min="0" max="100" value="50">
+                            </div>
+                        </div>
+                    </section>
+
+                     <section class="control-section collapsible open">
+                        <div class="section-header" data-toggle="collapse">
+                             <h2>Workspace</h2>
+                             <span class="chevron"></span>
+                        </div>
+                         <div class="collapsible-content">
+                              <div class="workspace-actions">
+                                <button class="workspace-btn" id="undo-btn" disabled>Undo</button>
+                                <button class="workspace-btn" id="redo-btn" disabled>Redo</button>
+                                <button class="workspace-btn" id="save-prompt-btn">Save to Library</button>
+                                <button class="workspace-btn" id="clear-all-btn">Clear All</button>
+                            </div>
+                         </div>
+                    </section>
+                </main>
+
+                <footer class="app-footer">
+                    <button class="add-btn">+</button>
+                    <button class="create-btn" id="create-btn"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M9 13c0 1.105-1.12 2-2.5 2S4 14.105 4 13s1.12-2 2.5-2 2.5.895 2.5 2z"/><path fill-rule="evenodd" d="M9 3v10H8V3h1z"/><path d="M8 2.82a1 1 0 0 1 .804-.98l3-.6A1 1 0 0 1 13 2.22V4L8 5V2.82z"/><path fill-rule="evenodd" d="M0 11.5a.5.5 0 0 1 .5-.5H4a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5zm0-4A.5.5 0 0 1 .5 7H4a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5zm0-4A.5.5 0 0 1 .5 3H4a.5.5 0 0 1 0 1H.5a.5.5 0 0 1-.5-.5z"/></svg> Create</button>
+                </footer>
+            </aside>
+            
+            <div id="modal" class="modal">
+                <div class="modal-content">
+                    <span class="close-button">&times;</span>
+                    <h2>Describe your song</h2>
+                    <p>Paste your song description, lyrics, and style ideas below. Our AI will automatically fill out the fields for you.</p>
+                    <textarea id="modal-textarea" placeholder="e.g., A cheerful pop song about summer vacation titled 'Sunny Days'. Make it sound like 80s synth-pop with a female vocalist. Lyrics: Woke up this morning, sun in the sky..."></textarea>
+                    <button id="modal-submit-btn">Parse and Apply</button>
+                    <div id="loading-indicator" class="hidden">Parsing...</div>
+                </div>
+            </div>
+
+            <div id="create-modal" class="modal">
+                <div class="modal-content">
+                    <span class="close-button">&times;</span>
+                    <h2>Your Generated Prompt</h2>
+                    <p>Copy the prompt below and paste it into your favorite AI music generator.</p>
+                    <pre id="final-prompt-display"></pre>
+                    <div class="modal-actions">
+                        <button id="copy-prompt-btn">Copy to Clipboard</button>
+                        <button id="export-prompt-btn">Export as .txt</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="generate-lyrics-modal" class="modal">
+                <div class="modal-content">
+                    <span class="close-button">&times;</span>
+                    <h2>Generate Lyrics</h2>
+                    <p>Enter a theme, topic, or mood, and the AI will write lyrics for you.</p>
+                    <textarea id="generate-lyrics-input" placeholder="e.g., A song about a long road trip through the desert at sunset..."></textarea>
+                    <button id="generate-lyrics-submit-btn">Generate</button>
+                    <div id="generate-lyrics-loading" class="hidden">Generating...</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="library-view" class="hidden">
+            <header class="library-header">
+                <button id="back-to-main-btn">&larr; Back to Editor</button>
+                <h2>Prompt Library</h2>
+            </header>
+            <div id="prompt-list-container">
+                <ul id="prompt-list">
+                    <!-- Saved prompts will be dynamically inserted here -->
+                </ul>
+                <div id="empty-library-message" class="hidden">
+                    <h3>Your library is empty.</h3>
+                    <p>Click "Save to Library" in the editor to add a prompt.</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+</html>
