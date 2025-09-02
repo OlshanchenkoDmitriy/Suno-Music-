@@ -24,11 +24,24 @@ const styleInfluenceSlider = document.getElementById('style-influence') as HTMLI
 const styleInfluenceValue = document.getElementById('style-influence-value') as HTMLSpanElement;
 const clearAllBtn = document.getElementById('clear-all-btn') as HTMLButtonElement;
 const savePromptBtn = document.getElementById('save-prompt-btn') as HTMLButtonElement;
+const formatLyricsBtn = document.getElementById('format-lyrics-btn') as HTMLButtonElement;
 const fixLyricsBtn = document.getElementById('fix-lyrics-btn') as HTMLButtonElement;
 const createBtn = document.getElementById('create-btn') as HTMLButtonElement;
 const myPromptsBtn = document.getElementById('my-prompts-btn') as HTMLButtonElement;
 const undoBtn = document.getElementById('undo-btn') as HTMLButtonElement;
 const redoBtn = document.getElementById('redo-btn') as HTMLButtonElement;
+
+// Field Action Buttons
+const copyTitleBtn = document.getElementById('copy-title-btn') as HTMLButtonElement;
+const pasteTitleBtn = document.getElementById('paste-title-btn') as HTMLButtonElement;
+const clearTitleBtn = document.getElementById('clear-title-btn') as HTMLButtonElement;
+const copyLyricsBtn = document.getElementById('copy-lyrics-btn') as HTMLButtonElement;
+const pasteLyricsBtn = document.getElementById('paste-lyrics-btn') as HTMLButtonElement;
+const clearLyricsBtn = document.getElementById('clear-lyrics-btn') as HTMLButtonElement;
+const copyStylesBtn = document.getElementById('copy-styles-btn') as HTMLButtonElement;
+const pasteStylesBtn = document.getElementById('paste-styles-btn') as HTMLButtonElement;
+const clearStylesBtn = document.getElementById('clear-styles-btn') as HTMLButtonElement;
+
 
 // "Write Lyrics" Modal elements
 const writeModal = document.getElementById('modal') as HTMLDivElement;
@@ -52,6 +65,7 @@ const closeGenerateLyricsModalBtn = generateLyricsModal.querySelector('.close-bu
 const generateLyricsInput = document.getElementById('generate-lyrics-input') as HTMLTextAreaElement;
 const generateLyricsSubmitBtn = document.getElementById('generate-lyrics-submit-btn') as HTMLButtonElement;
 const generateLyricsLoading = document.getElementById('generate-lyrics-loading') as HTMLDivElement;
+const byLineBtn = document.getElementById('by-line-btn') as HTMLButtonElement;
 
 // Library View Elements
 const backToMainBtn = document.getElementById('back-to-main-btn') as HTMLButtonElement;
@@ -73,7 +87,6 @@ interface AppState {
     styleInfluence: string;
 }
 
-// FIX: Renamed `history` to `stateHistory` to avoid conflict with `window.history`.
 let stateHistory: AppState[] = [];
 let redoStack: AppState[] = [];
 let isUndoingOrRedoing = false;
@@ -91,7 +104,6 @@ function getCurrentState(): AppState {
 }
 
 function updateUndoRedoButtons() {
-    // FIX: Renamed `history` to `stateHistory` to avoid conflict with `window.history`.
     undoBtn.disabled = stateHistory.length <= 1;
     redoBtn.disabled = redoStack.length === 0;
 }
@@ -100,25 +112,20 @@ function recordState() {
     if (isUndoingOrRedoing) return;
 
     const currentState = getCurrentState();
-    // FIX: Renamed `history` to `stateHistory` to avoid conflict with `window.history`.
     const lastState = stateHistory[stateHistory.length - 1];
     if (lastState && JSON.stringify(lastState) === JSON.stringify(currentState)) {
         return; // Don't record duplicate states
     }
 
-    // FIX: Renamed `history` to `stateHistory` to avoid conflict with `window.history`.
     stateHistory.push(currentState);
     redoStack = []; // Clear redo stack on a new action
     updateUndoRedoButtons();
 }
 
 function handleUndo() {
-    // FIX: Renamed `history` to `stateHistory` to avoid conflict with `window.history`.
     if (stateHistory.length > 1) {
-        // FIX: Renamed `history` to `stateHistory` to avoid conflict with `window.history`.
         const currentState = stateHistory.pop()!;
         redoStack.push(currentState);
-        // FIX: Renamed `history` to `stateHistory` to avoid conflict with `window.history`.
         const prevState = stateHistory[stateHistory.length - 1];
         applyState(prevState);
         updateUndoRedoButtons();
@@ -128,7 +135,6 @@ function handleUndo() {
 function handleRedo() {
     if (redoStack.length > 0) {
         const nextState = redoStack.pop()!;
-        // FIX: Renamed `history` to `stateHistory` to avoid conflict with `window.history`.
         stateHistory.push(nextState);
         applyState(nextState);
         updateUndoRedoButtons();
@@ -230,6 +236,21 @@ function showMainView() {
 
 
 // --- ASYNC & EVENT HANDLERS ---
+
+// --- CLIPBOARD HANDLERS ---
+function handleCopy(text: string) {
+    navigator.clipboard.writeText(text).catch(err => console.error('Failed to copy: ', err));
+}
+
+async function handlePaste(callback: (text: string) => void) {
+    try {
+        const text = await navigator.clipboard.readText();
+        callback(text);
+    } catch (err) {
+        console.error('Failed to read clipboard contents: ', err);
+        alert('Failed to paste. Please check clipboard permissions.');
+    }
+}
 
 // --- PROMPT LIBRARY (LOCAL STORAGE) ---
 
@@ -432,7 +453,10 @@ function setupEventListeners() {
 
 
     // Lyrics Actions
+    formatLyricsBtn.addEventListener('click', handleFormatLyrics);
     fixLyricsBtn.addEventListener('click', handleFixLyrics);
+    byLineBtn.addEventListener('click', handleContinueByLine);
+
 
     // View Switching
     myPromptsBtn.addEventListener('click', showLibraryView);
@@ -441,6 +465,54 @@ function setupEventListeners() {
     // Library Event Delegation
     promptList.addEventListener('click', handleLibraryActions);
     
+    // Field Action Icon Handlers
+    copyTitleBtn.addEventListener('click', () => handleCopy(songTitleInput.value));
+    pasteTitleBtn.addEventListener('click', () => handlePaste(text => {
+        songTitleInput.value = text;
+        recordState();
+    }));
+    clearTitleBtn.addEventListener('click', () => {
+        songTitleInput.value = '';
+        recordState();
+    });
+
+    copyLyricsBtn.addEventListener('click', () => handleCopy(lyricsInput.value));
+    pasteLyricsBtn.addEventListener('click', () => handlePaste(text => {
+        lyricsInput.value = text;
+        updateLyricsCharCount();
+        recordState();
+    }));
+    clearLyricsBtn.addEventListener('click', () => {
+        lyricsInput.value = '';
+        updateLyricsCharCount();
+        recordState();
+    });
+
+    copyStylesBtn.addEventListener('click', () => handleCopy(styleTags.join(', ')));
+    pasteStylesBtn.addEventListener('click', () => handlePaste(text => {
+        const newTags = text.split(',').map(tag => tag.trim()).filter(Boolean);
+        if (newTags.length > 0) {
+            const currentLength = styleTags.reduce((acc, tag) => acc + tag.length, 0);
+            const newLength = newTags.reduce((acc, tag) => acc + tag.length, 0);
+            if (currentLength + newLength > MAX_STYLES_CHARS) {
+                 alert(`Cannot paste styles. Total characters would exceed ${MAX_STYLES_CHARS}.`);
+                 return;
+            }
+            styleTags.push(...newTags.filter(tag => !styleTags.includes(tag)));
+            renderStyleTags();
+            fetchAndRenderSuggestions();
+            recordState();
+        }
+    }));
+    clearStylesBtn.addEventListener('click', () => {
+        if (styleTags.length > 0) {
+            styleTags = [];
+            renderStyleTags();
+            fetchAndRenderSuggestions();
+            recordState();
+        }
+    });
+
     // Track changes for undo/redo
     const inputsToTrack: HTMLElement[] = [
         lyricsInput, songTitleInput, instrumentalCheckbox, 
@@ -505,6 +577,174 @@ async function fetchAndRenderSuggestions() {
         }
     }
 }
+
+function handleFormatLyrics() {
+    const originalText = lyricsInput.value;
+    if (!originalText.trim()) {
+        return;
+    }
+
+    const tagMap: { [key: string]: string } = {
+        // --- Core Song Parts ---
+        // English
+        'intro': 'Intro',
+        'introduction': 'Intro',
+        'verse': 'Verse',
+        'pre-verse': 'Pre-Verse',
+        'pre verse': 'Pre-Verse',
+        'preverse': 'Pre-Verse',
+        'pre-chorus': 'Pre-Chorus',
+        'pre chorus': 'Pre-Chorus',
+        'prechorus': 'Pre-Chorus',
+        'chorus': 'Chorus',
+        'refrain': 'Chorus', // Refrain is often used like a chorus
+        'post-chorus': 'Post-Chorus',
+        'post chorus': 'Post-Chorus',
+        'postchorus': 'Post-Chorus',
+        'bridge': 'Bridge',
+        'outro': 'Outro',
+        'coda': 'Outro', // Coda is a type of outro
+
+        // Russian
+        'интро': 'Intro',
+        'вступление': 'Intro',
+        'куплет': 'Verse',
+        'пред-куплет': 'Pre-Verse',
+        'предкуплет': 'Pre-Verse',
+        'пред-припев': 'Pre-Chorus',
+        'предприпев': 'Pre-Chorus',
+        'пре-хорус': 'Pre-Chorus',
+        'припев': 'Chorus',
+        'хорус': 'Chorus',
+        'рефрен': 'Chorus',
+        'пост-припев': 'Post-Chorus',
+        'постприпев': 'Post-Chorus',
+        'бридж': 'Bridge',
+        'мост': 'Bridge',
+        'аутро': 'Outro',
+        'концовка': 'Outro',
+        'кода': 'Outro',
+
+        // --- Other Common Sections ---
+        // English
+        'hook': 'Hook',
+        'break': 'Break',
+        'breakdown': 'Break',
+        'interlude': 'Interlude',
+        'instrumental': 'Instrumental',
+        'solo': 'Solo',
+        'guitar solo': 'Guitar Solo',
+        'bass solo': 'Bass Solo',
+        'drum solo': 'Drum Solo',
+        'keyboard solo': 'Keyboard Solo',
+        'rap': 'Rap',
+        'spoken': 'Spoken',
+        'spoken word': 'Spoken',
+        'build': 'Build',
+        'buildup': 'Build',
+        'drop': 'Drop',
+        'skit': 'Skit',
+        'vocal': 'Vocal',
+        'vocals': 'Vocal',
+
+        // Russian
+        'хук': 'Hook',
+        'брейк': 'Break',
+        'проигрыш': 'Break',
+        'брейкдаун': 'Break',
+        'интерлюдия': 'Interlude',
+        'инструментал': 'Instrumental',
+        'соло': 'Solo',
+        'гитарное соло': 'Guitar Solo',
+        'соло на гитаре': 'Guitar Solo',
+        'рэп': 'Rap',
+        'речитатив': 'Rap',
+        'речь': 'Spoken',
+        'разгон': 'Build',
+        'дроп': 'Drop',
+        'скит': 'Skit',
+        'вокал': 'Vocal',
+        
+        // --- Fades ---
+        // English
+        'fade in': 'Fade In',
+        'fadein': 'Fade In',
+        'fade out': 'Fade Out',
+        'fadeout': 'Fade Out',
+
+        // Russian
+        'появление': 'Fade In',
+        'затухание': 'Fade Out',
+    };
+
+    const formatLine = (line: string): string => {
+        const trimmedLine = line.trim();
+
+        // Heuristic check: if the line is long or has many words, it's unlikely a tag.
+        if (trimmedLine.length > 40 || trimmedLine.split(' ').length > 4) {
+            return line;
+        }
+
+        // Clean the line from common delimiters for matching
+        const cleanedLine = trimmedLine.replace(/^[\(\[]|[\)\]:]+$/g, '').trim();
+
+        // Separate the text part from a potential number at the end
+        const match = cleanedLine.match(/^(.*?)\s*(\d*)$/);
+        
+        if (!match || !match[1]) {
+            return line;
+        }
+
+        let tagName = match[1].trim();
+        let number = match[2].trim();
+
+        // Normalize the tag name for map lookup: lowercase, handle hyphens vs spaces
+        const normalizedTagName = tagName.toLowerCase().replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
+
+        // If the normalized tag exists in our map, format it.
+        if (tagMap[normalizedTagName]) {
+            const standardTag = tagMap[normalizedTagName];
+            return `[${standardTag}${number ? ' ' + number : ''}]`;
+        }
+
+        // If no match is found, it's probably not a tag, so return the original line.
+        return line;
+    };
+
+    const formattedLyrics = originalText
+        .split('\n')
+        .map(formatLine) // Apply the formatting logic to every line
+        .join('\n');
+
+    lyricsInput.value = formattedLyrics;
+    updateLyricsCharCount();
+    recordState();
+}
+
+function handleContinueByLine() {
+    const currentLyrics = lyricsInput.value;
+    
+    // Find the last non-empty line by trimming trailing whitespace/newlines and splitting
+    const lines = currentLyrics.trimEnd().split('\n');
+    const lastLine = lines[lines.length - 1];
+
+    // If there's no actual content, do nothing
+    if (!lastLine || lastLine.trim() === '') {
+        return;
+    }
+
+    // Append the duplicated last line, ensuring there's a newline separating them.
+    lyricsInput.value = currentLyrics + '\n' + lastLine;
+
+    // Update UI and state
+    updateLyricsCharCount();
+    recordState();
+
+    // Focus and scroll to the new line
+    lyricsInput.focus();
+    lyricsInput.scrollTop = lyricsInput.scrollHeight;
+}
+
 
 async function handleFixLyrics() {
     const originalText = lyricsInput.value;
